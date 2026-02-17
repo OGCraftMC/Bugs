@@ -6,31 +6,26 @@ on:
 jobs:
   add-to-project:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
     steps:
       - name: Add issue to project
-        env:
-          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          PROJECT_NUMBER: 2
-          ORG: OGCraftMC 
         run: |
-          gh api graphql -f query='
-            query {
-              organization(login: "'"$ORG"'") {
-                projectV2(number: '"$PROJECT_NUMBER"') {
+          PROJECT_NUMBER=2
+          ORG=OGCraftMC          
+
+          PROJECT_ID=$(gh api graphql -f query='
+            query($org: String!, $num: Int!) {
+              organization(login: $org) {
+                projectV2(number: $num) {
                   id
                 }
               }
-            }' > project.json
-
-          PROJECT_ID=$(cat project.json | jq -r '.data.organization.projectV2.id')
-          ISSUE_ID=${{ github.event.issue.node_id }}
+            }' -f org="$ORG" -F num=$PROJECT_NUMBER --jq '.data.organization.projectV2.id')
 
           gh api graphql -f query='
-            mutation {
-              addProjectV2ItemById(input: {
-                projectId: "'"$PROJECT_ID"'"
-                contentId: "'"$ISSUE_ID"'"
-              }) {
+            mutation($proj: ID!, $item: ID!) {
+              addProjectV2ItemById(input: {projectId: $proj, contentId: $item}) {
                 item { id }
               }
-            }'
+            }' -f proj="$PROJECT_ID" -f item="${{ github.event.issue.node_id }}"
