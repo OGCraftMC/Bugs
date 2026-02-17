@@ -7,7 +7,30 @@ jobs:
   add-to-project:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/add-to-project@v0.7.0
-        with:
-          project-url: https://github.com/orgs/OGCraftMC/projects/2
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+      - name: Add issue to project
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          PROJECT_NUMBER: 2
+          ORG: OGCraftMC 
+        run: |
+          gh api graphql -f query='
+            query {
+              organization(login: "'"$ORG"'") {
+                projectV2(number: '"$PROJECT_NUMBER"') {
+                  id
+                }
+              }
+            }' > project.json
+
+          PROJECT_ID=$(cat project.json | jq -r '.data.organization.projectV2.id')
+          ISSUE_ID=${{ github.event.issue.node_id }}
+
+          gh api graphql -f query='
+            mutation {
+              addProjectV2ItemById(input: {
+                projectId: "'"$PROJECT_ID"'"
+                contentId: "'"$ISSUE_ID"'"
+              }) {
+                item { id }
+              }
+            }'
